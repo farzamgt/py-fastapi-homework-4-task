@@ -58,7 +58,7 @@ class ProfileRequestSchema(BaseModel):
 
     @field_validator("avatar")
     @classmethod
-    def validate_avatar(cls, avatar: UploadFile) -> UploadFile:
+    async def validate_avatar(cls, avatar: UploadFile) -> UploadFile:
         try:
             await s3_storage.upload_file(avatar)
         except S3FileUploadError:
