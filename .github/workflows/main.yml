@@ -46,7 +46,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install poetry
-          poetry lock --no-update
           poetry install
 
       - name: Run flake8
@@ -72,13 +71,27 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install poetry
-          poetry lock --no-update
           poetry install
 
       - name: Run flake8
         run: |
           poetry run flake8 src
 
-      - name: Run profiles tests
+      - name: Run movies tests
         run: |
           poetry run pytest src/tests/test_integration/test_profiles.py
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Start Docker Compose and wait for completion
+        run: |
+          docker compose -f docker-compose-tests.yml up --build --abort-on-container-exit --exit-code-from web
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose-tests.yml down
