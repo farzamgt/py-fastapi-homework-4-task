@@ -93,7 +93,6 @@ class ProfileRequestSchema(BaseModel):
                 }]
             )
 
-
     @field_validator("date_of_birth")
     @classmethod
     def validate_date_of_birth(cls, date_of_birth: date) -> date:
