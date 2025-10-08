@@ -1,7 +1,7 @@
 from datetime import date
 
 from fastapi import UploadFile, Form, File, HTTPException, status
-from pydantic import BaseModel, field_validator, HttpUrl
+from pydantic import BaseModel, field_validator, HttpUrl, ValidationInfo
 
 from src.enums.gender import GenderEnum
 from validation import (
@@ -51,19 +51,20 @@ class ProfileRequestSchema(BaseModel):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=[{
                     "type": "value_error",
-                    "loc": ["first_name" if "first_name" in name else "last_name"],
-                    "msg": str(e),
-                    "input": name
+                    "loc": [info.field_name],
+                    "msg": "Invalid name format",
                 }]
             )
 
     @field_validator("avatar")
     @classmethod
     def validate_avatar(cls, avatar: UploadFile) -> UploadFile:
-        if not avatar.filename.lower().endswith((".jpg", ".jpeg", ".png")):
+        try:
+            await s3_storage.upload_file(avatar)
+        except S3FileUploadError:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Invalid image format"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload avatar. Please try again later."
             )
 
         avatar.file.seek(0, 2)
