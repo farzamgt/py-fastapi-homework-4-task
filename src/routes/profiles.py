@@ -84,7 +84,7 @@ async def create_profile(
     except S3FileUploadError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Avatar upload failed: {str(e)}"
+            detail="Failed to upload avatar. Please try again later."
         )
 
     new_profile = UserProfileModel(

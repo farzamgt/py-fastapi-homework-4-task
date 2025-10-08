@@ -60,38 +60,39 @@ class ProfileRequestSchema(BaseModel):
     @field_validator("avatar")
     @classmethod
     def validate_avatar(cls, avatar: UploadFile) -> UploadFile:
-        try:
-            validate_image(avatar)
-            return avatar
-        except ValueError as e:
+        if not avatar.filename.lower().endswith((".jpg", ".jpeg", ".png")):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=[{
-                    "type": "value_error",
-                    "loc": ["avatar"],
-                    "msg": str(e),
-                    "input": avatar.filename
-                }]
+                detail="Invalid image format"
             )
+
+        avatar.file.seek(0, 2)
+        size = avatar.file.tell()
+        avatar.file.seek(0)
+        if size > 1 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Image size exceeds 1 MB"
+            )
+        return avatar
 
     @field_validator("gender")
     @classmethod
     def validate_gender(cls, gender: str) -> str:
-        gender_lower = gender.lower()
-        if gender_lower in ("man", "male"):
-            return GenderEnum.MAN
-        elif gender_lower in ("woman", "female"):
-            return GenderEnum.WOMAN
-        else:
+        try:
+            validate_gender(gender)
+            return gender
+        except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=[{
-                    "type": "value_error",
                     "loc": ["gender"],
-                    "msg": f"Invalid gender value: {gender}",
+                    "msg": "Gender must be one of: man, woman, other",
+                    "type": "value_error",
                     "input": gender
                 }]
             )
+
 
     @field_validator("date_of_birth")
     @classmethod
