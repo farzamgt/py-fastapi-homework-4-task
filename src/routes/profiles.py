@@ -22,16 +22,21 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED
 )
 async def create_profile(
-        user_id: int,
-        token: str = Depends(get_token),
-        request_data: ProfileRequestSchema = Depends(ProfileRequestSchema.as_form),
-        jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
-        s3_client: S3StorageInterface = Depends(get_s3_storage_client),
-        db: AsyncSession = Depends(get_db)
+    user_id: int,
+    token: str = Depends(get_token),
+    request_data: ProfileRequestSchema = Depends(ProfileRequestSchema.as_form),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+    s3_client: S3StorageInterface = Depends(get_s3_storage_client),
+    db: AsyncSession = Depends(get_db)
 ):
     try:
         payload = jwt_manager.decode_access_token(token)
         token_user_id = payload.get("user_id")
+        if token_user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token."
+            )
     except TokenExpiredError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,11 +47,10 @@ async def create_profile(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token."
         )
+
     if user_id != token_user_id:
         result_user_group = await db.execute(
-            select(UserGroupModel)
-            .join(UserModel)
-            .where(UserModel.id == token_user_id)
+            select(UserGroupModel).join(UserModel).where(UserModel.id == token_user_id)
         )
         user_group = result_user_group.scalar_one_or_none()
         if not user_group or user_group.name == UserGroupEnum.USER:
@@ -55,10 +59,7 @@ async def create_profile(
                 detail="You don't have permission to edit this profile."
             )
 
-    result_user = await db.execute(
-        select(UserModel)
-        .where(UserModel.id == user_id)
-    )
+    result_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
     user = result_user.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
@@ -67,11 +68,9 @@ async def create_profile(
         )
 
     result_user_profile = await db.execute(
-        select(UserProfileModel)
-        .where(UserProfileModel.user_id == user_id)
+        select(UserProfileModel).where(UserProfileModel.user_id == user_id)
     )
-    user_profile = result_user_profile.scalar_one_or_none()
-    if user_profile:
+    if result_user_profile.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User already has a profile."
@@ -82,10 +81,10 @@ async def create_profile(
     try:
         await s3_client.upload_file(file_name=avatar_file_name, file_data=avatar_bytes)
         avatar_url = await s3_client.get_file_url(avatar_file_name)
-    except Exception:
+    except S3FileUploadError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload avatar. Please try again later."
+            detail=f"Avatar upload failed: {str(e)}"
         )
 
     new_profile = UserProfileModel(

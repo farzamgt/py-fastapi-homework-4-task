@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import UploadFile, Form, File, HTTPException, status
 from pydantic import BaseModel, field_validator, HttpUrl
 
-from database.models.accounts import GenderEnum
+from src.enums.gender import GenderEnum
 from validation import (
     validate_name,
     validate_image,
@@ -77,16 +77,18 @@ class ProfileRequestSchema(BaseModel):
     @field_validator("gender")
     @classmethod
     def validate_gender(cls, gender: str) -> str:
-        try:
-            validate_gender(gender)
-            return gender
-        except ValueError as e:
+        gender_lower = gender.lower()
+        if gender_lower in ("man", "male"):
+            return GenderEnum.MAN
+        elif gender_lower in ("woman", "female"):
+            return GenderEnum.WOMAN
+        else:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=[{
                     "type": "value_error",
                     "loc": ["gender"],
-                    "msg": str(e),
+                    "msg": f"Invalid gender value: {gender}",
                     "input": gender
                 }]
             )
